@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Mumbai Rickshaw Simulator</title>
+
+<style>
+
+body{
+margin:0;
+background:linear-gradient(#ffe0f0,#e3f2ff);
+font-family:sans-serif;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+/* phone frame */
+
+.phone{
+width:360px;
+height:640px;
+background:white;
+border-radius:30px;
+box-shadow:0 20px 40px rgba(0,0,0,0.3);
+overflow:hidden;
+display:flex;
+flex-direction:column;
+position:relative;
+}
+
+/* header */
+
+.header{
+background:#ffd6ec;
+padding:10px;
+text-align:center;
+font-weight:600;
+}
+
+.score{
+text-align:center;
+padding:5px;
+background:#f4f7ff;
+}
+
+canvas{
+flex:1;
+}
+
+/* controls */
+
+.controls{
+display:flex;
+justify-content:space-around;
+padding:10px;
+background:#fff2f7;
+}
+
+button{
+border:none;
+background:#ffd6e7;
+padding:8px 14px;
+border-radius:18px;
+font-size:14px;
+cursor:pointer;
+}
+
+/* overlays */
+
+.overlay{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.6);
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+color:white;
+font-size:22px;
+}
+
+/* crash animation */
+
+@keyframes shake{
+0%{transform:translate(0px)}
+25%{transform:translate(6px)}
+50%{transform:translate(-6px)}
+75%{transform:translate(6px)}
+100%{transform:translate(0px)}
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="phone">
+
+<div class="header"> Mumbai Rickshaw Ride</div>
+<div class="score" id="score">Coins: 0 | Fuel: 100</div>
+
+<canvas id="game" width="360" height="500"></canvas>
+
+<div class="controls">
+<button onclick="moveLeft()" > << </button>
+<button onclick="moveRight()"> >> </button>
+<button onclick="togglePause()">⏸ Pause</button>
+<button onclick="toggleRain()">🌧 Rain</button>
+</div>
+
+<div id="startScreen" class="overlay">
+<div>🚕 Ready for a Mumbai ride?</div>
+<button onclick="startGame()">Start Ride</button>
+</div>
+
+<div id="gameOver" class="overlay" style="display:none">
+<div id="finalScore"></div>
+<button onclick="restartGame()">Restart Ride</button>
+</div>
+
+</div>
+
+<!-- horn sound -->
+
+<audio id="hornSound">
+<source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8c6e8b62fd.mp3?filename=car-horn-7184.mp3">
+</audio>
+
+<script>
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+let rickshaw,cars,coins,fuelPacks;
+let score,fuel,speed;
+
+let gameRunning=false;
+let paused=false;
+let rain=false;
+
+let signal="green";
+let signalTimer=0;
+
+/* start game */
+
+function startGame(){
+
+document.getElementById("startScreen").style.display="none";
+
+gameRunning=true;
+
+}
+
+/* initialize */
+
+function initGame(){
+
+rickshaw={x:160,y:420,w:40,h:60};
+
+cars=[];
+coins=[];
+fuelPacks=[];
+
+score=0;
+fuel=100;
+speed=2;
+
+paused=false;
+
+document.getElementById("gameOver").style.display="none";
+
+}
+
+initGame();
+
+/* controls */
+
+function moveLeft(){
+if(rickshaw.x>20) rickshaw.x-=25;
+}
+
+function moveRight(){
+if(rickshaw.x<300) rickshaw.x+=25;
+}
+
+document.addEventListener("keydown",e=>{
+if(e.key==="ArrowLeft") moveLeft();
+if(e.key==="ArrowRight") moveRight();
+});
+
+/* pause */
+
+function togglePause(){
+paused=!paused;
+}
+
+/* rain */
+
+function toggleRain(){
+rain=!rain;
+}
+
+/* spawn cars */
+
+function spawnCar(){
+
+if(!gameRunning || paused) return;
+
+cars.push({
+x:Math.random()*320,
+y:-60,
+w:40,
+h:60
+});
+
+/* horn sound */
+
+if(Math.random()<0.4){
+
+let horn=document.getElementById("hornSound");
+
+horn.currentTime=0;
+horn.play();
+
+}
+
+}
+
+/* spawn coins */
+
+function spawnCoin(){
+
+if(!gameRunning || paused) return;
+
+coins.push({
+x:Math.random()*340,
+y:-20,
+r:10
+});
+
+}
+
+/* spawn fuel */
+
+function spawnFuel(){
+
+fuelPacks.push({
+x:Math.random()*340,
+y:-20,
+r:12
+});
+
+}
+
+/* traffic signal */
+
+function updateSignal(){
+
+signalTimer++;
+
+if(signalTimer>300){
+
+signal = signal==="green" ? "red" : "green";
+
+signalTimer=0;
+
+}
+
+}
+
+/* draw signal */
+
+function drawSignal(){
+
+ctx.fillStyle="black";
+ctx.fillRect(310,220,20,60);
+
+ctx.fillStyle = signal==="red" ? "red" : "#550000";
+ctx.beginPath();
+ctx.arc(320,235,6,0,Math.PI*2);
+ctx.fill();
+
+ctx.fillStyle = signal==="green" ? "green" : "#003300";
+ctx.beginPath();
+ctx.arc(320,260,6,0,Math.PI*2);
+ctx.fill();
+
+}
+
+/* road */
+
+function drawRoad(){
+
+ctx.fillStyle="#dde5ff";
+ctx.fillRect(0,200,360,300);
+
+ctx.strokeStyle="white";
+ctx.lineWidth=4;
+
+for(let i=200;i<500;i+=40){
+
+ctx.beginPath();
+ctx.moveTo(180,i);
+ctx.lineTo(180,i+20);
+ctx.stroke();
+
+}
+
+}
+
+/* rain */
+
+function drawRain(){
+
+if(!rain) return;
+
+ctx.strokeStyle="rgba(0,0,255,0.3)";
+
+for(let i=0;i<40;i++){
+
+let x=Math.random()*360;
+let y=Math.random()*500;
+
+ctx.beginPath();
+ctx.moveTo(x,y);
+ctx.lineTo(x,y+10);
+ctx.stroke();
+
+}
+
+}
+
+/* rickshaw */
+
+function drawRickshaw(){
+
+ctx.fillStyle="#ffd166";
+ctx.fillRect(rickshaw.x,rickshaw.y,40,45);
+
+ctx.fillStyle="#06d6a0";
+ctx.fillRect(rickshaw.x,rickshaw.y-15,40,15);
+
+}
+
+/* crash shake */
+
+function screenShake(){
+
+let phone=document.querySelector(".phone");
+
+phone.style.animation="shake 0.4s";
+
+setTimeout(()=>{
+phone.style.animation="";
+},400);
+
+}
+
+/* cars */
+
+function drawCars(){
+
+ctx.fillStyle="#ff8fab";
+
+cars.forEach((c,i)=>{
+
+if(signal==="green") c.y+=speed;
+
+ctx.fillRect(c.x,c.y,c.w,c.h);
+
+if(c.y>520) cars.splice(i,1);
+
+if(
+rickshaw.x<c.x+c.w &&
+rickshaw.x+rickshaw.w>c.x &&
+rickshaw.y<c.y+c.h &&
+rickshaw.y+rickshaw.h>c.y
+){
+
+screenShake();
+gameOver();
+
+}
+
+});
+
+}
+
+/* coins */
+
+function drawCoins(){
+
+coins.forEach((coin,i)=>{
+
+coin.y+=speed;
+
+ctx.fillStyle="#ffe066";
+
+ctx.beginPath();
+ctx.arc(coin.x,coin.y,coin.r,0,Math.PI*2);
+ctx.fill();
+
+if(
+rickshaw.x<coin.x &&
+rickshaw.x+rickshaw.w>coin.x &&
+rickshaw.y<coin.y &&
+rickshaw.y+rickshaw.h>coin.y
+){
+
+score+=10;
+coins.splice(i,1);
+
+}
+
+});
+
+}
+
+/* fuel */
+
+function drawFuel(){
+
+fuelPacks.forEach((f,i)=>{
+
+f.y+=speed;
+
+ctx.fillStyle="#00bbf9";
+
+ctx.beginPath();
+ctx.arc(f.x,f.y,f.r,0,Math.PI*2);
+ctx.fill();
+
+if(
+rickshaw.x<f.x &&
+rickshaw.x+rickshaw.w>f.x &&
+rickshaw.y<f.y &&
+rickshaw.y+rickshaw.h>f.y
+){
+
+fuel+=30;
+fuelPacks.splice(i,1);
+
+}
+
+});
+
+}
+
+/* score */
+
+function updateScore(){
+
+fuel-=0.05;
+
+document.getElementById("score").innerText=
+"Coins: "+score+" | Fuel: "+Math.floor(fuel);
+
+if(fuel<=0) gameOver();
+
+}
+
+/* game over */
+
+function gameOver(){
+
+gameRunning=false;
+
+document.getElementById("gameOver").style.display="flex";
+
+document.getElementById("finalScore").innerText=
+"Ride Ended 🚧 Coins: "+score;
+
+}
+
+/* restart */
+
+function restartGame(){
+
+initGame();
+
+gameRunning=true;
+
+}
+
+/* difficulty */
+
+setInterval(()=>{
+speed+=0.1;
+},6000);
+
+/* game loop */
+
+function gameLoop(){
+
+ctx.clearRect(0,0,360,500);
+
+if(gameRunning && !paused){
+
+updateSignal();
+
+drawRoad();
+drawRain();
+drawSignal();
+
+drawRickshaw();
+drawCars();
+drawCoins();
+drawFuel();
+
+updateScore();
+
+}
+
+requestAnimationFrame(gameLoop);
+
+}
+
+setInterval(spawnCar,1500);
+setInterval(spawnCoin,2000);
+setInterval(spawnFuel,7000);
+
+gameLoop();
+
+</script>
+
+</body>
+</html>
+  
